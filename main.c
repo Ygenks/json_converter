@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
+#include "cJSON/cJSON.h"
 
 #define SSID_LEN 100
 #define PSK_LEN 100
@@ -56,29 +57,52 @@ field_descriptor_t field_descriptor[]  = {
 	{0}
 };
 
+
+char* json = "{ \"wifi_ssid\":\"123ssid\", \"wifi_psk\":\"psk\", \"lwm2m_secure\":true}";
+device_config_t _device_config = {
+	.wifi_ssid = "default_ssid",
+	.lwm2m_port = 1234,
+	.wifi_psk = "adminadmin",
+	.lwm2m_secure = true,
+	.sleep_interval = 40
+};
+device_config_t *g_device_config = &_device_config;
+
 int main(void)
 {
-	for (int i = 0; field_descriptor[i].name != NULL ; ++i) {
+	/* for (int i = 0; field_descriptor[i].name != NULL ; ++i) { */
 
-		printf("Name: %s\n", field_descriptor[i].name);
+	/* 	printf("Name: %s\n", field_descriptor[i].name); */
 
-		switch (field_descriptor[i].type) {
-		case INT: {
-			printf("Type: int\n");
-			break;
-		}
-		case STRING: {
-			printf("Type: char*\n");
-			break;
-		}
-		case BOOL: {
-			printf("Type: bool\n");
-			break;
-		}
-		}
+	/* 	switch (field_descriptor[i].type) { */
+	/* 	case INT: { */
+	/* 		printf("Type: int\n"); */
+	/* 		break; */
+	/* 	} */
+	/* 	case STRING: { */
+	/* 		printf("Type: char*\n"); */
+	/* 		break; */
+	/* 	} */
+	/* 	case BOOL: { */
+	/* 		printf("Type: bool\n"); */
+	/* 		break; */
+	/* 	} */
+	/* 	} */
 
-		printf("Offset: %zd\n", field_descriptor[i].offset);
-		printf("\n");
+	/* 	printf("Offset: %zd\n", field_descriptor[i].offset); */
+	/* 	printf("\n"); */
 
+	/* } */
+
+	cJSON *object = cJSON_Parse(json);
+
+	printf("old ssid %s\n", g_device_config->wifi_ssid);
+
+	cJSON *ssid = cJSON_GetObjectItem(object, field_descriptor[0].name);
+	if (cJSON_IsString(ssid)) {
+		strncpy(g_device_config + field_descriptor[0].offset, "kek", sizeof(WIFI_SSID) - 1);
 	}
+
+	printf("new ssid %s\n", g_device_config->wifi_ssid);
+
 }
