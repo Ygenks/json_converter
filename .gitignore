@@ -55,6 +55,11 @@ dkms.conf
 .projectile
 #*#
 *~
+.clang_complete
 
 #Rtags
 compile_commands.json
+
+#Valgrind
+vgcore*
+
