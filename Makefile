@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Wextra -pedantic -g
+CFLAGS=-Wall -Wextra -pedantic -std=c11
 TARGET=main
 LIBS=cJSON/cJSON.c cJSON/cJSON.h
 
