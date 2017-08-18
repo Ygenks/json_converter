@@ -6,35 +6,72 @@
 #include <limits.h>
 #include "cJSON/cJSON.h"
 
-#define MAX_WIFI_SSID_LEN 32
-#define MAX_WIFI_PWD_LEN 63
+#define MAX_DOMAIN_NAME_LEN      64
+#define MAX_WIFI_SSID_LEN        32
+#define MAX_WIFI_PWD_LEN         63
+#define MAX_LWM2M_IDENTITY_LEN   64
+#define MAX_LWM2M_PSK_LEN        64
+#define MAX_DEVICE_MODE_LEN      20
+#define MAX_DEVICE_POWER_LEN     10
 
+/*Config fields names*/
+#define WIFI_SSID_STR            "wifi_ssid"
+#define WIFI_PASS_STR            "wifi_pwd"
+#define WIFI_AP_SSID_STR         "wifi_ap_ssid"
+#define WIFI_AP_PASS_STR         "wifi_ap_pwd"
+#define LWM2M_SERVER_STR         "lwm2m_server"
+#define LWM2M_PORT_STR           "lwm2m_port"
+#define LWM2M_IDENTITY_STR       "lwm2m_id"
+#define LWM2M_PSK_STR            "lwm2m_psk"
+#define LWM2M_SECURE_STR         "lwm2m_secure"
+#define LWM2M_BOOTSTR_STR        "lwm2m_bootstrap"
+#define DEVICE_POWER_STR         "device_power"
+#define SLEEP_INTERVAL_STR       "sleep_interval"
+#define LWM2M_LIFETIME           "lwm2m_lifetime"
+#define SYSLOG_SERVER_STR        "syslog_server"
 
-#define WIFI_SSID "wifi_ssid"
-#define WIFI_PWD "wifi_pwd"
-#define LWM2M_PORT "lwm2m_port"
-#define LWM2M_SECURE "lwm2m_secure"
-#define SLEEP_INTERVAL "sleep_interval"
+typedef enum {
+    DM_CONFIGURATION,
+    DM_OPERATION,
+    DM_DEBUG,
+} device_mode_t;
+
+typedef enum {
+    DP_BATTERY,
+    DP_DC,
+} device_power_t;
 
 typedef struct {
     char wifi_ssid[MAX_WIFI_SSID_LEN];
-    int lwm2m_port;
     char wifi_pwd[MAX_WIFI_PWD_LEN];
+    char wifi_ap_ssid[MAX_WIFI_SSID_LEN];
+    char wifi_ap_pwd[MAX_WIFI_PWD_LEN];
+    char lwm2m_server[MAX_DOMAIN_NAME_LEN];
+    int  lwm2m_port;
+    char lwm2m_id[MAX_LWM2M_IDENTITY_LEN];
+    char lwm2m_psk[MAX_LWM2M_PSK_LEN];
     bool lwm2m_secure;
+    bool lwm2m_bootstrap;
+    int lwm2m_lifetime;
+    /* device_power_t device_power; */
     int sleep_interval;
+    char syslog_server[MAX_DOMAIN_NAME_LEN];
+
+    bool cfg_is_dirty;
+    /* device_mode_t device_mode; */
 } device_config_t;
 
-device_config_t _device_config = {
-    .wifi_ssid = "default",
-    .lwm2m_port = 1234,
-    .wifi_pwd = "adminadmin",
+static device_config_t _device_config = {
+    .sleep_interval = 100,
+    .lwm2m_port = -1,
     .lwm2m_secure = false,
-    .sleep_interval = 40
+    .lwm2m_bootstrap = false,
+    .cfg_is_dirty = false,
 };
 
 device_config_t *g_device_config = &_device_config;
 
-enum type_t { INT, STRING, BOOL };
+enum type_t { INT, STRING, BOOL, };
 
 struct field_desc_t;
 typedef int (*config_handler_t)(cJSON *object, struct field_desc_t descriptor);
@@ -123,7 +160,7 @@ int read_bool_callback(cJSON *object, struct field_desc_t descriptor)
 
 field_descriptor_t field_descriptor[]  = {
     {
-	.name = WIFI_SSID,
+	.name = WIFI_SSID_STR,
 	.type = STRING,
 	.offset = offsetof(device_config_t, wifi_ssid),
 	.max = MAX_WIFI_SSID_LEN,
@@ -132,16 +169,7 @@ field_descriptor_t field_descriptor[]  = {
     .read_callback = read_string_callback
     },
     {
-	.name = LWM2M_PORT,
-	.type = INT,
-	.offset = offsetof(device_config_t, lwm2m_port),
-	.max = 65535,
-	.min = 0,
-	.write_callback = write_int_callback,
-    .read_callback = read_int_callback
-    },
-    {
-	.name = WIFI_PWD,
+	.name = WIFI_PASS_STR,
 	.type = STRING,
 	.offset = offsetof(device_config_t, wifi_pwd),
 	.max = MAX_WIFI_PWD_LEN,
@@ -150,7 +178,61 @@ field_descriptor_t field_descriptor[]  = {
     .read_callback = read_string_callback
     },
     {
-	.name = LWM2M_SECURE,
+	.name = WIFI_AP_SSID_STR,
+	.type = STRING,
+	.offset = offsetof(device_config_t, wifi_ap_ssid),
+	.max = MAX_WIFI_SSID_LEN,
+	.min = 0,
+	.write_callback = write_string_callback,
+    .read_callback = read_string_callback
+    },
+    {
+	.name = WIFI_AP_PASS_STR,
+	.type = STRING,
+	.offset = offsetof(device_config_t, wifi_ap_pwd),
+	.max = MAX_WIFI_SSID_LEN,
+	.min = 0,
+	.write_callback = write_string_callback,
+    .read_callback = read_string_callback
+    },
+    {
+	.name = LWM2M_SERVER_STR,
+	.type = STRING,
+	.offset = offsetof(device_config_t, lwm2m_server),
+	.max = MAX_DOMAIN_NAME_LEN,
+	.min = 0,
+	.write_callback = write_string_callback,
+    .read_callback = read_string_callback
+    },
+    {
+	.name = LWM2M_PORT_STR,
+	.type = INT,
+	.offset = offsetof(device_config_t, lwm2m_port),
+	.max = 65535,
+	.min = 0,
+	.write_callback = write_int_callback,
+    .read_callback = read_int_callback
+    },
+    {
+	.name = LWM2M_IDENTITY_STR,
+	.type = STRING,
+	.offset = offsetof(device_config_t, lwm2m_id),
+	.max = MAX_LWM2M_IDENTITY_LEN,
+	.min = 0,
+	.write_callback = write_string_callback,
+    .read_callback = read_string_callback
+    },
+    {
+	.name = LWM2M_PSK_STR,
+	.type = STRING,
+	.offset = offsetof(device_config_t, lwm2m_psk),
+	.max = MAX_LWM2M_PSK_LEN,
+	.min = 0,
+	.write_callback = write_string_callback,
+    .read_callback = read_string_callback
+    },
+    {
+	.name = LWM2M_SECURE_STR,
 	.type = BOOL,
 	.offset = offsetof(device_config_t, lwm2m_secure),
 	.max = 1,
@@ -159,7 +241,25 @@ field_descriptor_t field_descriptor[]  = {
     .read_callback = read_bool_callback
     },
     {
-	.name = SLEEP_INTERVAL,
+	.name = LWM2M_BOOTSTR_STR,
+	.type = BOOL,
+	.offset = offsetof(device_config_t, lwm2m_bootstrap),
+	.max = 1,
+	.min = 0,
+	.write_callback = write_bool_callback,
+    .read_callback = read_bool_callback
+    },
+    {
+	.name = LWM2M_LIFETIME,
+	.type = INT,
+	.offset = offsetof(device_config_t, lwm2m_lifetime),
+	.max = 1000,
+	.min = 0,
+	.write_callback = write_int_callback,
+    .read_callback = read_int_callback
+    },
+    {
+	.name = SLEEP_INTERVAL_STR,
 	.type = INT,
 	.offset = offsetof(device_config_t, sleep_interval),
 	.max = INT_MAX,
@@ -167,22 +267,63 @@ field_descriptor_t field_descriptor[]  = {
 	.write_callback = write_int_callback,
     .read_callback = read_int_callback
     },
+    {
+	.name = SYSLOG_SERVER_STR,
+	.type = STRING,
+	.offset = offsetof(device_config_t, syslog_server),
+	.max = MAX_DOMAIN_NAME_LEN,
+	.min = 0,
+	.write_callback = write_string_callback,
+    .read_callback = read_string_callback
+    },
     {0}
 };
 
-const char *json_str = "{ \"wifi_ssid\":\"qwertyuiop\", \"wifi_pwd\":\"psk\", "
-		       "\"lwm2m_secure\":true, \"sleep_interval\":1488, "
-		       "\"lwm2m_port\":4321 }";
+/* const char *json_str = "{ \"wifi_ssid\":\"qwertyuiop\", \"wifi_pwd\":\"psk\", " */
+/* 		       "\"lwm2m_secure\":true, \"sleep_interval\":1488, " */
+/* 		       "\"lwm2m_port\":4321 }"; */
 
+
+
+const char* json_str = "{"
+"  \"wifi_ssid\":       \"HUAWEI-D2mT\","
+"  \"wifi_pwd\":        \"485754431A3C7880\","
+"  \"wifi_ap_ssid\":    \"device_ap\","
+"  \"wifi_ap_pwd\":     \"1234567890\","
+"  \"lwm2m_server\":    \"leshan.eclipse.org\","
+"  \"lwm2m_port\":      228,"
+"  \"lwm2m_id\":        \"magic_device\","
+"  \"lwm2m_psk\":       \"psk\","
+"  \"lwm2m_secure\":    false,"
+"  \"lwm2m_bootstrap\": false,"
+"  \"lwm2m_lifetime\":  10,"
+"  \"device_power\":    \"DC\","
+"  \"sleep_interval\":   228,"
+"  \"syslog_server\":   \"192.168.121.1\""
+"}";
 
 void print_config(void)
 {
-    printf("%s: %s\n", WIFI_SSID, g_device_config->wifi_ssid);
-    printf("%s: %s\n", WIFI_PWD, g_device_config->wifi_pwd);
-    printf("%s: %d\n", LWM2M_PORT, g_device_config->lwm2m_port);
-    printf("%s: %s\n", LWM2M_SECURE, g_device_config->lwm2m_secure ? "true" : "false");
-    printf("%s: %d\n", SLEEP_INTERVAL, g_device_config->sleep_interval);
+    printf("Current config:\n");
+    printf("-----------------------------\n");
+
+    printf("%s: %s\n", WIFI_SSID_STR, g_device_config->wifi_ssid);
+    printf("%s: %s\n", WIFI_PASS_STR, g_device_config->wifi_pwd);
+    printf("%s: %s\n", WIFI_AP_SSID_STR, g_device_config->wifi_ap_ssid);
+    printf("%s: %s\n", WIFI_AP_PASS_STR, g_device_config->wifi_ap_pwd);
+    printf("%s: %s\n", LWM2M_SERVER_STR, g_device_config->lwm2m_server);
+    printf("%s: %d\n", LWM2M_PORT_STR, g_device_config->lwm2m_port);
+    printf("%s: %s\n", LWM2M_IDENTITY_STR, g_device_config->lwm2m_id);
+    printf("%s: %s\n", LWM2M_PSK_STR, g_device_config->lwm2m_psk);
+    printf("%s: %s\n", LWM2M_SECURE_STR, g_device_config->lwm2m_secure ? "true" : "false");
+    printf("%s: %s\n", LWM2M_BOOTSTR_STR, g_device_config->lwm2m_bootstrap ? "true" : "false");
+    printf("%s: %d\n", LWM2M_LIFETIME, g_device_config->lwm2m_lifetime);
+    printf("%s: %d\n", SLEEP_INTERVAL_STR, g_device_config->sleep_interval);
+    printf("%s: %s\n", SYSLOG_SERVER_STR, g_device_config->syslog_server);
+
+    printf("-----------------------------\n");
 }
+
 
 int json_to_config(const char *json_str)
 {
@@ -230,5 +371,9 @@ int config_to_json()
 
 int main(void)
 {
+    print_config();
+    json_to_config(json_str);
+    print_config();
+
 
 }
