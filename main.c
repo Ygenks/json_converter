@@ -91,6 +91,34 @@ int write_bool_callback(cJSON *object, struct field_desc_t descriptor)
 	}
 }
 
+int read_string_callback(cJSON *object, struct field_desc_t descriptor)
+{
+	void *field_address = (char *) g_device_config + descriptor.offset;
+
+    cJSON_AddStringToObject(object, descriptor.name, (char*) field_address);
+
+    return 0;
+}
+
+int read_int_callback(cJSON *object, struct field_desc_t descriptor)
+{
+	void *field_address = (char *) g_device_config + descriptor.offset;
+
+    cJSON_AddNumberToObject(object, descriptor.name,  *((int*)field_address));
+
+    return 0;
+}
+
+int read_bool_callback(cJSON *object, struct field_desc_t descriptor)
+{
+	void *field_address = (char *) g_device_config + descriptor.offset;
+
+    *((bool *)field_address) ? cJSON_AddTrueToObject(object, descriptor.name) :
+        cJSON_AddFalseToObject(object, descriptor.name);
+
+    return 0;
+}
+
 
 
 field_descriptor_t field_descriptor[]  = {
@@ -100,7 +128,8 @@ field_descriptor_t field_descriptor[]  = {
 	.offset = offsetof(device_config_t, wifi_ssid),
 	.max = MAX_WIFI_SSID_LEN,
 	.min = 0,
-	.write_callback = write_string_callback
+	.write_callback = write_string_callback,
+    .read_callback = read_string_callback
     },
     {
 	.name = LWM2M_PORT,
@@ -108,7 +137,8 @@ field_descriptor_t field_descriptor[]  = {
 	.offset = offsetof(device_config_t, lwm2m_port),
 	.max = 65535,
 	.min = 0,
-	.write_callback = write_int_callback
+	.write_callback = write_int_callback,
+    .read_callback = read_int_callback
     },
     {
 	.name = WIFI_PWD,
@@ -116,7 +146,8 @@ field_descriptor_t field_descriptor[]  = {
 	.offset = offsetof(device_config_t, wifi_pwd),
 	.max = MAX_WIFI_PWD_LEN,
 	.min = 0,
-	.write_callback = write_string_callback
+	.write_callback = write_string_callback,
+    .read_callback = read_string_callback
     },
     {
 	.name = LWM2M_SECURE,
@@ -124,7 +155,8 @@ field_descriptor_t field_descriptor[]  = {
 	.offset = offsetof(device_config_t, lwm2m_secure),
 	.max = 1,
 	.min = 0,
-	.write_callback = write_bool_callback
+	.write_callback = write_bool_callback,
+    .read_callback = read_bool_callback
     },
     {
 	.name = SLEEP_INTERVAL,
@@ -132,7 +164,8 @@ field_descriptor_t field_descriptor[]  = {
 	.offset = offsetof(device_config_t, sleep_interval),
 	.max = INT_MAX,
 	.min = 0,
-	.write_callback = write_int_callback
+	.write_callback = write_int_callback,
+    .read_callback = read_int_callback
     },
     {0}
 };
@@ -163,22 +196,16 @@ int json_to_config(const char *json_str)
 
     subitem = root->child;
 
-    int i = 0;
-
     while (subitem) {
 
 		for (int i = 0; field_descriptor[i].name != 0; i++) {
 
 			field_descriptor_t descriptor = field_descriptor[i];
-
 			if (strncmp(subitem->string, descriptor.name,strlen(subitem->string)) == 0) {
-
 				descriptor.write_callback(subitem, descriptor);
-
 			}
 		}
 		subitem = subitem->next;
-		i++;
     }
 
 	cJSON_Delete(root);
@@ -186,10 +213,22 @@ int json_to_config(const char *json_str)
     return 0;
 }
 
+int config_to_json()
+{
+    cJSON *root;
+
+    root = cJSON_CreateObject();
+
+    for (int i = 0; field_descriptor[i].name != 0; i++) {
+        field_descriptor_t descriptor = field_descriptor[i];
+        descriptor.read_callback(root, descriptor);
+    }
+
+    return 0;
+}
+
 
 int main(void)
 {
-	print_config();
-	json_to_config(json_str);
-	print_config();
+
 }
