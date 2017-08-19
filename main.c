@@ -53,10 +53,9 @@ typedef struct {
     bool lwm2m_secure;
     bool lwm2m_bootstrap;
     int lwm2m_lifetime;
-    /* device_power_t device_power; */
+    device_power_t device_power;
     int sleep_interval;
     char syslog_server[MAX_DOMAIN_NAME_LEN];
-
     bool cfg_is_dirty;
     /* device_mode_t device_mode; */
 } device_config_t;
@@ -71,18 +70,18 @@ static device_config_t _device_config = {
 
 device_config_t *g_device_config = &_device_config;
 
-enum type_t { INT, STRING, BOOL, };
+typedef enum type_t { INT, STRING, BOOL } type_t;
 
 struct field_desc_t;
 typedef int (*config_handler_t)(cJSON *object, struct field_desc_t descriptor);
-typedef struct field_desc_t{
+typedef struct field_desc_t {
     char *name;
     enum type_t type;
     size_t offset;
-	int max;
-	int min;
-	config_handler_t write_callback;
-	config_handler_t read_callback;
+    int max;
+    int min;
+    config_handler_t write_callback;
+    config_handler_t read_callback;
 } field_descriptor_t;
 
 
@@ -126,6 +125,12 @@ int write_bool_callback(cJSON *object, struct field_desc_t descriptor)
 		*((bool *)field_address) = object->type == cJSON_True;
 		return 0;
 	}
+}
+
+int write_power_callback(cJSON *object, struct field_desc_t descriptor)
+{
+	void *field_address = (char *) g_device_config + descriptor.offset;
+
 }
 
 int read_string_callback(cJSON *object, struct field_desc_t descriptor)
@@ -209,7 +214,7 @@ field_descriptor_t field_descriptor[]  = {
 	.type = INT,
 	.offset = offsetof(device_config_t, lwm2m_port),
 	.max = 65535,
-	.min = 0,
+	.min = -1,
 	.write_callback = write_int_callback,
     .read_callback = read_int_callback
     },
@@ -253,10 +258,19 @@ field_descriptor_t field_descriptor[]  = {
 	.name = LWM2M_LIFETIME,
 	.type = INT,
 	.offset = offsetof(device_config_t, lwm2m_lifetime),
+	.max = 1,
+	.min = 0,
+	.write_callback = write_power_callback,
+	.read_callback = read_power_callback
+    },
+    {
+	.name = LWM2M_LIFETIME,
+	.type = INT,
+	.offset = offsetof(device_config_t, device_power),
 	.max = 1000,
 	.min = 0,
 	.write_callback = write_int_callback,
-    .read_callback = read_int_callback
+	.read_callback = read_int_callback
     },
     {
 	.name = SLEEP_INTERVAL_STR,
@@ -291,12 +305,12 @@ const char* json_str = "{"
 "  \"wifi_ap_ssid\":    \"device_ap\","
 "  \"wifi_ap_pwd\":     \"1234567890\","
 "  \"lwm2m_server\":    \"leshan.eclipse.org\","
-"  \"lwm2m_port\":      228,"
+"  \"lwm2m_port\":      -1,"
 "  \"lwm2m_id\":        \"magic_device\","
 "  \"lwm2m_psk\":       \"psk\","
-"  \"lwm2m_secure\":    false,"
-"  \"lwm2m_bootstrap\": false,"
-"  \"lwm2m_lifetime\":  10,"
+"  \"lwm2m_secure\":    true,"
+"  \"lwm2m_bootstrap\": true,"
+"  \"lwm2m_lifetime\":  228,"
 "  \"device_power\":    \"DC\","
 "  \"sleep_interval\":   228,"
 "  \"syslog_server\":   \"192.168.121.1\""
@@ -323,6 +337,7 @@ void print_config(void)
 
     printf("-----------------------------\n");
 }
+
 
 
 int json_to_config(const char *json_str)
@@ -354,7 +369,7 @@ int json_to_config(const char *json_str)
     return 0;
 }
 
-int config_to_json()
+int config_to_json(void)
 {
     cJSON *root;
 
@@ -368,12 +383,9 @@ int config_to_json()
     return 0;
 }
 
-
 int main(void)
 {
     print_config();
     json_to_config(json_str);
     print_config();
-
-
 }
