@@ -65,6 +65,7 @@ static device_config_t _device_config = {
     .lwm2m_port = -1,
     .lwm2m_secure = false,
     .lwm2m_bootstrap = false,
+	.device_power = DP_DC,
     .cfg_is_dirty = false,
 };
 
@@ -130,6 +131,31 @@ int write_bool_callback(cJSON *object, struct field_desc_t descriptor)
 int write_power_callback(cJSON *object, struct field_desc_t descriptor)
 {
 	void *field_address = (char *) g_device_config + descriptor.offset;
+
+	if(object->type == cJSON_String && strlen(object->valuestring) < descriptor.max) {
+
+		if (strncmp(object->valuestring, "DC", strlen(object->valuestring)) == 0) {
+
+			*((device_power_t *)field_address) = DP_DC;
+
+		} else if (strncmp(object->valuestring, "BATTERY", strlen(object->valuestring)) == 0) {
+
+			*((device_power_t *)field_address) = DP_BATTERY;
+
+		} else {
+
+			fprintf(stderr, "Provided %s has incorrect type!\n", descriptor.name);
+			return  -1;
+
+		}
+	} else {
+
+		fprintf(stderr, "Provided %s has incorrect type!\n", descriptor.name);
+		return  -1;
+
+	}
+
+	return 0;
 
 }
 
@@ -258,19 +284,18 @@ field_descriptor_t field_descriptor[]  = {
 	.name = LWM2M_LIFETIME,
 	.type = INT,
 	.offset = offsetof(device_config_t, lwm2m_lifetime),
-	.max = 1,
-	.min = 0,
-	.write_callback = write_power_callback,
-	.read_callback = read_power_callback
-    },
-    {
-	.name = LWM2M_LIFETIME,
-	.type = INT,
-	.offset = offsetof(device_config_t, device_power),
 	.max = 1000,
 	.min = 0,
 	.write_callback = write_int_callback,
 	.read_callback = read_int_callback
+    },
+	{
+	.name = DEVICE_POWER_STR,
+	.type = INT,
+	.offset = offsetof(device_config_t, device_power),
+	.max = MAX_DEVICE_POWER_LEN,
+	.min = 0,
+	.write_callback = write_power_callback
     },
     {
 	.name = SLEEP_INTERVAL_STR,
@@ -311,8 +336,8 @@ const char* json_str = "{"
 "  \"lwm2m_secure\":    true,"
 "  \"lwm2m_bootstrap\": true,"
 "  \"lwm2m_lifetime\":  228,"
-"  \"device_power\":    \"DC\","
-"  \"sleep_interval\":   228,"
+"  \"device_power\":    \"BATTERY\","
+"  \"sleep_interval\":   1488,"
 "  \"syslog_server\":   \"192.168.121.1\""
 "}";
 
@@ -332,11 +357,13 @@ void print_config(void)
     printf("%s: %s\n", LWM2M_SECURE_STR, g_device_config->lwm2m_secure ? "true" : "false");
     printf("%s: %s\n", LWM2M_BOOTSTR_STR, g_device_config->lwm2m_bootstrap ? "true" : "false");
     printf("%s: %d\n", LWM2M_LIFETIME, g_device_config->lwm2m_lifetime);
+	printf("%s: %s\n", DEVICE_POWER_STR, g_device_config->device_power ? "DC" : "BATTERY");
     printf("%s: %d\n", SLEEP_INTERVAL_STR, g_device_config->sleep_interval);
     printf("%s: %s\n", SYSLOG_SERVER_STR, g_device_config->syslog_server);
 
     printf("-----------------------------\n");
 }
+
 
 
 
