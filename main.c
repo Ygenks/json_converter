@@ -57,7 +57,7 @@ typedef struct {
     int sleep_interval;
     char syslog_server[MAX_DOMAIN_NAME_LEN];
     bool cfg_is_dirty;
-    /* device_mode_t device_mode; */
+    device_mode_t device_mode;
 } device_config_t;
 
 static device_config_t _device_config = {
@@ -187,6 +187,17 @@ int read_bool_callback(cJSON *object, struct field_desc_t descriptor)
     return 0;
 }
 
+int read_power_callback(cJSON *object, struct field_desc_t descriptor)
+{
+	void *field_address = (char *) g_device_config + descriptor.offset;
+
+	*((device_power_t *)field_address) == DP_BATTERY
+	    ? cJSON_AddStringToObject(object, descriptor.name, "BATTERY")
+	    : cJSON_AddStringToObject(object, descriptor.name, "DC");
+
+	return 0;
+}
+
 
 
 field_descriptor_t field_descriptor[]  = {
@@ -295,7 +306,8 @@ field_descriptor_t field_descriptor[]  = {
 	.offset = offsetof(device_config_t, device_power),
 	.max = MAX_DEVICE_POWER_LEN,
 	.min = 0,
-	.write_callback = write_power_callback
+	.write_callback = write_power_callback,
+	.read_callback = read_power_callback
     },
     {
 	.name = SLEEP_INTERVAL_STR,
@@ -396,7 +408,7 @@ int json_to_config(const char *json_str)
     return 0;
 }
 
-int config_to_json(void)
+cJSON* config_to_json(void)
 {
     cJSON *root;
 
@@ -407,12 +419,19 @@ int config_to_json(void)
         descriptor.read_callback(root, descriptor);
     }
 
-    return 0;
+    return root;
 }
 
 int main(void)
 {
-    print_config();
-    json_to_config(json_str);
-    print_config();
+
+	cJSON *root = config_to_json();
+
+	char *rendered = cJSON_Print(root);
+
+	printf("%s", rendered);
+
+	cJSON_Delete(root);
+
+	return 0;
 }
