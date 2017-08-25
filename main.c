@@ -71,13 +71,13 @@ static device_config_t _device_config = {
 
 device_config_t *g_device_config = &_device_config;
 
-typedef enum type_t { INT, STRING, BOOL } type_t;
+typedef enum descriptor_field_type { INT, STRING, BOOL } descriptor_field_type;
 
 struct field_desc_t;
-typedef int (*config_handler_t)(cJSON *object, struct field_desc_t descriptor);
+typedef int (*config_handler_t)(cJSON *object, struct field_desc_t descriptor, device_config_t *config);
 typedef struct field_desc_t {
     char *name;
-    enum type_t type;
+    enum descriptor_field_type type;
     size_t offset;
     int max;
     int min;
@@ -86,9 +86,9 @@ typedef struct field_desc_t {
 } field_descriptor_t;
 
 
-int write_int_callback(cJSON *object, struct field_desc_t descriptor)
+int write_int_callback(cJSON *object, struct field_desc_t descriptor, device_config_t *config)
 {
-    void *field_address = (char *) g_device_config + descriptor.offset;
+    void *field_address = (char *) config + descriptor.offset;
 
 	int value = (int) object->valuedouble;
 	bool in_interval = value >= descriptor.min && value <= descriptor.max;
@@ -105,9 +105,9 @@ int write_int_callback(cJSON *object, struct field_desc_t descriptor)
     }
 }
 
-int write_string_callback(cJSON *object, struct field_desc_t descriptor)
+int write_string_callback(cJSON *object, struct field_desc_t descriptor, device_config_t *config)
 {
-    void *field_address = (char *) g_device_config + descriptor.offset;
+    void *field_address = (char *) config + descriptor.offset;
 
     if (object->type == cJSON_String && (int) strlen(object->valuestring) < descriptor.max)
 	{
@@ -121,9 +121,9 @@ int write_string_callback(cJSON *object, struct field_desc_t descriptor)
     }
 }
 
-int write_bool_callback(cJSON *object, struct field_desc_t descriptor)
+int write_bool_callback(cJSON *object, struct field_desc_t descriptor, device_config_t *config)
 {
-    void *field_address = (char *) g_device_config + descriptor.offset;
+    void *field_address = (char *) config + descriptor.offset;
 
     if (object->type != cJSON_True && object->type != cJSON_False)
 	{
@@ -137,9 +137,9 @@ int write_bool_callback(cJSON *object, struct field_desc_t descriptor)
     }
 }
 
-int write_power_callback(cJSON *object, struct field_desc_t descriptor)
+int write_power_callback(cJSON *object, struct field_desc_t descriptor, device_config_t *config)
 {
-    void *field_address = (char *) g_device_config + descriptor.offset;
+    void *field_address = (char *) config + descriptor.offset;
 
     if(object->type == cJSON_String && (int) strlen(object->valuestring) < descriptor.max)
 	{
@@ -167,27 +167,27 @@ int write_power_callback(cJSON *object, struct field_desc_t descriptor)
 
 }
 
-int read_string_callback(cJSON *object, struct field_desc_t descriptor)
+int read_string_callback(cJSON *object, struct field_desc_t descriptor, device_config_t *config)
 {
-    void *field_address = (char *) g_device_config + descriptor.offset;
+    void *field_address = (char *) config + descriptor.offset;
 
     cJSON_AddStringToObject(object, descriptor.name, (char*) field_address);
 
     return 0;
 }
 
-int read_int_callback(cJSON *object, struct field_desc_t descriptor)
+int read_int_callback(cJSON *object, struct field_desc_t descriptor, device_config_t *config)
 {
-    void *field_address = (char *) g_device_config + descriptor.offset;
+    void *field_address = (char *) config + descriptor.offset;
 
     cJSON_AddNumberToObject(object, descriptor.name,  *((int*)field_address));
 
     return 0;
 }
 
-int read_bool_callback(cJSON *object, struct field_desc_t descriptor)
+int read_bool_callback(cJSON *object, struct field_desc_t descriptor, device_config_t *config)
 {
-    void *field_address = (char *) g_device_config + descriptor.offset;
+    void *field_address = (char *) config + descriptor.offset;
 
     *((bool *)field_address) ? cJSON_AddTrueToObject(object, descriptor.name) :
         cJSON_AddFalseToObject(object, descriptor.name);
@@ -195,9 +195,9 @@ int read_bool_callback(cJSON *object, struct field_desc_t descriptor)
     return 0;
 }
 
-int read_power_callback(cJSON *object, struct field_desc_t descriptor)
+int read_power_callback(cJSON *object, struct field_desc_t descriptor, device_config_t *config)
 {
-    void *field_address = (char *) g_device_config + descriptor.offset;
+    void *field_address = (char *) config + descriptor.offset;
 
     *((device_power_t *)field_address) == DP_BATTERY
         ? cJSON_AddStringToObject(object, descriptor.name, "BATTERY")
@@ -409,7 +409,7 @@ int json_to_config(const char *json_str)
             field_descriptor_t descriptor = field_descriptor[i];
             if (strncmp(subitem->string, descriptor.name,strlen(subitem->string)) == 0)
 			{
-                descriptor.write_callback(subitem, descriptor);
+                descriptor.write_callback(subitem, descriptor, &_device_config);
             }
         }
         subitem = subitem->next;
@@ -429,7 +429,7 @@ cJSON* config_to_json(void)
     for (int i = 0; field_descriptor[i].name != 0; i++)
 	{
         field_descriptor_t descriptor = field_descriptor[i];
-        descriptor.read_callback(root, descriptor);
+        descriptor.read_callback(root, descriptor, &_device_config);
     }
 
     return root;
@@ -437,13 +437,17 @@ cJSON* config_to_json(void)
 
 int main(void)
 {
-    cJSON *root = config_to_json();
+    /* cJSON *root = config_to_json(); */
 
-    char *rendered = cJSON_Print(root);
+    /* char *rendered = cJSON_Print(root); */
 
-    printf("%s", rendered);
+    /* printf("%s", rendered); */
 
-    cJSON_Delete(root);
+	/* cJSON_Delete(root); */
+
+	print_config();
+	json_to_config(json_str);
+	print_config();
 
     return 0;
 }
