@@ -90,7 +90,10 @@ int write_int_callback(cJSON *object, struct field_desc_t descriptor)
 {
     void *field_address = (char *) g_device_config + descriptor.offset;
 
-    if ((int) (object->valuedouble) >= descriptor.min && (int) (object->valuedouble) <= descriptor.max )
+	int value = (int) object->valuedouble;
+	bool in_interval = value >= descriptor.min && value <= descriptor.max;
+
+    if (object->type == cJSON_Number && in_interval)
 	{
         *((int *)field_address) = (int) object->valuedouble;
         return 0;
